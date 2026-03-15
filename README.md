@@ -6,8 +6,6 @@ Collaborator is a place to build with agents.
 
 ![Collaborator](screenshot.png)
 
-Agents are incredible, and multiagent workflows are becoming a reality. But today, working with multiple agents means juggling terminal panes, switching between apps, and losing track of what's running where. It's a mess.
-
 Collaborator is an end-to-end environment for agentic development. Terminals, context files, and running code — all arranged on an infinite canvas in one place. No context switching, no tab hunting. Just your agents and your work, side by side.
 
 The app is early-stage and in active development. macOS only for now.
