@@ -1,6 +1,3 @@
----
-type: "note"
----
 # Collaborator
 
 Collaborator is a place to build with agents.
