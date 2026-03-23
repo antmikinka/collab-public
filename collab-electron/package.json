@@ -15,9 +15,14 @@
 		"package": "./scripts/package.sh",
 		"package:unsigned": "./scripts/package.sh --no-sign",
 		"release": "bun run package && bun scripts/upload-to-github.cjs",
+		"package:win": "electron-builder --win --x64 --arm64",
+		"package:win:x64": "electron-builder --win --x64",
+		"package:win:arm64": "electron-builder --win --arm64",
+		"package:mac": "electron-builder --mac",
 		"test": "bun test",
 		"test:updater": "bun test src/main/updater/github-release-fetcher.test.ts && bun test src/main/updater/downloader.test.ts && bun test src/main/updater/update-manager.test.ts",
-		"postinstall": "electron-rebuild -f -w node-pty"
+		"postinstall": "electron-rebuild -f -w node-pty",
+		"sign:win": "bun scripts/sign-win.cjs"
 	},
 	"build": {
 		"appId": "com.collaborator.desktop",
@@ -43,7 +48,7 @@
 			"package.json",
 			"NOTICE"
 		],
-		"afterSign": "scripts/notarize.cjs",
+		"afterSign": "scripts/after-sign.cjs",
 		"afterAllArtifactBuild": "scripts/fix-artifacts.cjs",
 		"extraResources": [
 			{
@@ -92,6 +97,29 @@
 					"arch": "arm64"
 				}
 			]
+		},
+		"win": {
+			"target": [
+				{
+					"target": "nsis",
+					"arch": ["x64", "arm64"]
+				}
+			],
+			"artifactName": "${productName}-${version}-win-${arch}.${ext}",
+			"icon": "resources/icon.ico",
+			"requestedExecutionLevel": "asInvoker",
+			"signingHashAlgorithms": ["sha256"],
+			"sign": "./scripts/sign-win.cjs"
+		},
+		"nsis": {
+			"oneClick": false,
+			"allowToChangeInstallationDirectory": true,
+			"include": "build/installer.nsh",
+			"artifactName": "${productName}-${version}-win-${arch}-setup.${ext}",
+			"uninstallDisplayName": "${productName}",
+			"createDesktopShortcut": true,
+			"createStartMenuShortcut": true,
+			"shortcutName": "Collaborator"
 		}
 	},
 	"dependencies": {
