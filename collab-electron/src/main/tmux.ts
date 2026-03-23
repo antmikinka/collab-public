@@ -3,12 +3,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { COLLAB_DIR } from "./paths";
+import type { SessionMeta } from "./terminal-backend";
 
-export interface SessionMeta {
-  shell: string;
-  cwd: string;
-  createdAt: string;
-}
+// Re-export SessionMeta for backward compatibility
+export type { SessionMeta };
 
 export const SESSION_DIR = path.join(
   COLLAB_DIR, "terminal-sessions",
@@ -61,7 +59,16 @@ function baseArgs(): string[] {
 function tmuxEnv(): Record<string, string> | undefined {
   const dir = getTerminfoDir();
   if (!dir) return undefined;
-  return { ...process.env, TERMINFO: dir } as Record<string, string>;
+
+  const env: Record<string, string> = {};
+  // Filter out undefined values and build a clean string-only record
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+  env.TERMINFO = dir;
+  return env;
 }
 
 export function tmuxExec(...args: string[]): string {
