@@ -70,6 +70,10 @@
 			{
 				"from": "scripts/collab-cli.sh",
 				"to": "collab-cli.sh"
+			},
+			{
+				"from": "scripts/collab-cli.bat",
+				"to": "collab-cli.bat"
 			}
 		],
 		"mac": {
