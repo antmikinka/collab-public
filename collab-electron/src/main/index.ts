@@ -44,11 +44,22 @@ import {
 import { stopImageWorker } from "./image-service";
 import { installCli } from "./cli-installer";
 
+// Platform-specific environment setup
 // macOS apps launched from Finder don't inherit the user's shell
 // LANG, so child processes (tmux, shells) default to ASCII.
-if (!process.env.LANG || !process.env.LANG.includes("UTF-8")) {
-  process.env.LANG = "en_US.UTF-8";
+if (process.platform === "darwin") {
+  if (!process.env.LANG || !process.env.LANG.includes("UTF-8")) {
+    process.env.LANG = "en_US.UTF-8";
+  }
 }
+// Windows: Set default code page to UTF-8 for consistent encoding
+if (process.platform === "win32") {
+  process.env.CHCP = "65001";
+}
+
+// Linux: Placeholder for future platform support
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const isLinux = process.platform === "linux";
 
 process.on("uncaughtException", (error) => {
   trackEvent("app_crash", {
@@ -112,6 +123,16 @@ if (app.isPackaged && process.platform === "darwin") {
     // Fall through with the default PATH if shell resolution fails.
   }
 }
+// Windows: Ensure system paths are available for child processes
+if (process.platform === "win32") {
+  // Windows GUI apps may have limited PATH; ensure System32 is available
+  const systemRoot = process.env["SystemRoot"] || "C:\\Windows";
+  const windir = process.env["windir"] || systemRoot;
+  const system32 = join(systemRoot, "System32");
+  if (!process.env["PATH"]?.includes(system32)) {
+    process.env["PATH"] = [system32, windir, systemRoot, process.env["PATH"]].filter(Boolean).join(";");
+  }
+}
 
 const DEFAULT_STATE: WindowState = {
   x: 0,
@@ -120,7 +141,27 @@ const DEFAULT_STATE: WindowState = {
   height: 800,
 };
 
+function isValidWindowState(state: WindowState): boolean {
+  return (
+    isFinite(state.x) &&
+    isFinite(state.y) &&
+    isFinite(state.width) &&
+    isFinite(state.height) &&
+    state.width > 0 &&
+    state.height > 0
+  );
+}
+
+function shouldUseSavedWindowState(state: WindowState | null): boolean {
+  if (state === null) return false;
+  // If window was maximized, always restore maximized state
+  if (state.isMaximized) return true;
+  // Otherwise, validate bounds and check visibility
+  return isValidWindowState(state) && boundsVisibleOnAnyDisplay(state);
+}
+
 function boundsVisibleOnAnyDisplay(bounds: WindowState): boolean {
+  if (!isValidWindowState(bounds)) return false;
   const displays = screen.getAllDisplays();
   return displays.some((display) => {
     const { x, y, width, height } = display.workArea;
@@ -318,6 +359,7 @@ function applyZoomToAll(level: number): void {
 
 function buildAppMenu(): void {
   const isMac = process.platform === "darwin";
+  const isWindows = process.platform === "win32";
 
   const template: Electron.MenuItemConstructorOptions[] = [
     ...(isMac
@@ -354,6 +396,16 @@ function buildAppMenu(): void {
           registerAccelerator: false,
           click: () => sendShortcut("add-workspace"),
         },
+        ...(isWindows ? [
+          { type: "separator" as const },
+          {
+            label: "Exit",
+            accelerator: "Alt+F4",
+            click: () => {
+              mainWindow?.close();
+            },
+          } as Electron.MenuItemConstructorOptions,
+        ] : []),
       ],
     },
     {
@@ -404,7 +456,7 @@ function buildAppMenu(): void {
         { role: "toggleDevTools" },
         {
           label: "Toggle Full Screen",
-          accelerator: "Ctrl+Cmd+F",
+          accelerator: isWindows ? "F11" : "Ctrl+Cmd+F",
           click: (_, win) => win?.setFullScreen(!win.isFullScreen()),
         },
       ],
@@ -422,6 +474,21 @@ function buildAppMenu(): void {
           : [{ role: "close" as const }]),
       ],
     },
+    ...(isWindows
+      ? [
+          {
+            label: "Help",
+            submenu: [
+              {
+                label: `About ${app.name}`,
+                click: () => {
+                  trackEvent("menu_about_clicked");
+                },
+              },
+            ],
+          },
+        ]
+      : []),
   ];
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
@@ -442,20 +509,28 @@ function getRendererURL(name: string): string {
 
 function createWindow(): void {
   const saved = config.window_state;
-  const useSaved =
-    saved !== null &&
-    (saved.isMaximized || boundsVisibleOnAnyDisplay(saved));
+  const useSaved = shouldUseSavedWindowState(saved);
   const state = useSaved ? saved : DEFAULT_STATE;
+
+  const isMac = process.platform === "darwin";
 
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
     width: state.width,
     height: state.height,
     minWidth: 400,
     minHeight: 400,
-    titleBarStyle: "hidden",
-    vibrancy: "under-window",
-    visualEffectState: "active",
-    trafficLightPosition: { x: 14, y: 12 },
+    // macOS-specific window options
+    titleBarStyle: isMac ? "hidden" : undefined,
+    vibrancy: isMac ? "under-window" : undefined,
+    visualEffectState: isMac ? "active" : undefined,
+    trafficLightPosition: isMac ? { x: 14, y: 12 } : undefined,
+    // Windows-specific window options
+    frame: process.platform === "win32" ? false : undefined,
+    titleBarOverlay: process.platform === "win32" ? {
+      color: "#1e1e1e",
+      symbolColor: "#ffffff",
+      height: 32,
+    } : undefined,
     webPreferences: {
       preload: getPreloadPath("shell"),
       contextIsolation: true,
