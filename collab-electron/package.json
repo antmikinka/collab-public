@@ -74,18 +74,6 @@
 			"notarize": false,
 			"entitlements": "build/entitlements.mac.plist",
 			"entitlementsInherit": "build/entitlements.mac.plist",
-			"fileAssociations": [
-				{
-					"ext": [
-						"md",
-						"mdx",
-						"markdown",
-						"txt"
-					],
-					"name": "Text Document",
-					"role": "Editor"
-				}
-			],
 			"target": [
 				{
 					"target": "zip",
