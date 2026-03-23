@@ -20,7 +20,7 @@ import {
   readFile,
   stat,
 } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, platform } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 import { createFileFilter, type FileFilter } from "./file-filter";
 import fm from "front-matter";
@@ -183,9 +183,126 @@ echo "  rpc result: $RESULT" >> "$LOG"
 exit 0
 `;
 
+/**
+ * Windows PowerShell version of the agent notify script.
+ * Note: Windows named pipes use a different protocol than Unix sockets.
+ * On Windows, the JSON-RPC server uses TCP instead of Unix sockets.
+ */
+const AGENT_NOTIFY_SCRIPT_PS1 = `#Requires -Version 5.1
+$ErrorActionPreference = "Stop"
+
+$COLLAB_DIR = Join-Path $env:USERPROFILE ".collaborator"
+$LOG = Join-Path $COLLAB_DIR "hook-debug.log"
+$SOCKET_PATH_FILE = Join-Path $COLLAB_DIR "socket-path"
+
+# Read input from stdin
+$InputText = [Console]::In.ReadToEnd()
+$Timestamp = Get-Date -Format "o"
+Add-Content -Path $LOG -Value "[$Timestamp] hook fired"
+Add-Content -Path $LOG -Value "  raw input: $InputText"
+
+try {
+  $InputJson = $InputText | ConvertFrom-Json
+  $Event = $InputJson.hook_event_name
+} catch {
+  Add-Content -Path $LOG -Value "  failed to parse input JSON: $_"
+  exit 0
+}
+
+# Read TCP endpoint from socket-path file (Windows uses TCP instead of named pipes)
+if (Test-Path $SOCKET_PATH_FILE) {
+  $TCP_ENDPOINT = Get-Content -Path $SOCKET_PATH_FILE -Raw
+} else {
+  Add-Content -Path $LOG -Value "  socket-path file not found"
+  exit 0
+}
+
+# Parse TCP endpoint (format: tcp://localhost:PORT)
+if ($TCP_ENDPOINT -match "^tcp://([^:]+):(\d+)$") {
+  $HostAddr = $matches[1]
+  $Port = [int]$matches[2]
+} else {
+  Add-Content -Path $LOG -Value "  invalid TCP endpoint: $TCP_ENDPOINT"
+  exit 0
+}
+
+$Method = $null
+$PayloadJson = $null
+
+switch ($Event) {
+  "SessionStart" {
+    $Method = "agent.sessionStart"
+    $PtyId = if ($env:COLLAB_PTY_SESSION_ID) { $env:COLLAB_PTY_SESSION_ID } else { "" }
+    $Payload = @{
+      session_id = $InputJson.session_id
+      cwd = $InputJson.cwd
+      pty_session_id = $PtyId
+    }
+    $PayloadJson = $Payload | ConvertTo-Json -Compress
+  }
+  "PostToolUse" {
+    $Method = "agent.fileTouched"
+    $FilePath = $InputJson.tool_input.file_path
+    if (-not $FilePath) {
+      $FilePath = $InputJson.tool_input.path
+    }
+    $Payload = @{
+      session_id = $InputJson.session_id
+      tool_name = $InputJson.tool_name
+      file_path = $FilePath
+    }
+    $PayloadJson = $Payload | ConvertTo-Json -Compress
+  }
+  "SessionEnd" {
+    $Method = "agent.sessionEnd"
+    $Payload = @{
+      session_id = $InputJson.session_id
+    }
+    $PayloadJson = $Payload | ConvertTo-Json -Compress
+  }
+  default {
+    Add-Content -Path $LOG -Value "  unknown event: $Event"
+    exit 0
+  }
+}
+
+Add-Content -Path $LOG -Value "  method=$Method payload=$PayloadJson"
+
+try {
+  # Send JSON-RPC request over TCP
+  $RpcMessage = '{"jsonrpc":"2.0","id":1,"method":"' + $Method + '","params":' + $PayloadJson + '}'
+  $Client = New-Object System.Net.Sockets.TcpClient($HostAddr, $Port)
+  $Stream = $Client.GetStream()
+  $Writer = New-Object System.IO.StreamWriter($Stream, [System.Text.Encoding]::UTF8)
+  $Writer.WriteLine($RpcMessage)
+  $Writer.Flush()
+
+  # Read response with timeout
+  $Client.ReceiveTimeout = 1000
+  $Reader = New-Object System.IO.StreamReader($Stream)
+  $Result = $Reader.ReadLine()
+  Add-Content -Path $LOG -Value "  rpc result: $Result"
+
+  $Reader.Close()
+  $Writer.Close()
+  $Client.Close()
+} catch {
+  Add-Content -Path $LOG -Value "  rpc call failed: $_"
+}
+
+exit 0
+`;
+
 function buildHooksConfig(): Record<string, unknown> {
-  const agentScript =
-    '"$CLAUDE_PROJECT_DIR"/.claude/hooks/agent-notify.sh';
+  const plat = platform();
+  const isWindows = plat === "win32";
+  const sep = isWindows ? "\\" : "/";
+
+  // Windows uses PowerShell script (.ps1), Unix uses bash script (.sh)
+  const agentScript = isWindows
+    ? `"${"$CLAUDE_PROJECT_DIR"}${sep}.claude${sep}hooks${sep}agent-notify.ps1"`
+    : `"${"$CLAUDE_PROJECT_DIR"}${sep}.claude${sep}hooks${sep}agent-notify.sh"`;
+
   return {
     SessionStart: [
       {
@@ -248,6 +365,42 @@ const RPC_BLOCK_END = "<!-- collaborator:rpc-end -->";
 
 function buildRpcBlock(): string {
   const socketPathFile = join(homedir(), ".collaborator", "socket-path");
+  const plat = platform();
+  const isWindows = plat === "win32";
+
+  if (isWindows) {
+    // Windows uses TCP instead of Unix domain sockets
+    return [
+      RPC_BLOCK_START,
+      "",
+      "## Collaborator RPC",
+      "",
+      "The Collaborator desktop app exposes a JSON-RPC 2.0 server over TCP on Windows.",
+      `Read the TCP endpoint from \`${socketPathFile}\`, then send newline-delimited JSON.`,
+      "",
+      "Call `rpc.discover` to list available methods:",
+      "```powershell",
+      `$TCP_ENDPOINT = Get-Content -Path "${socketPathFile}" -Raw`,
+      `# Parse endpoint (format: tcp://localhost:PORT)`,
+      `if ($TCP_ENDPOINT -match "^tcp://([^:]+):(\d+)$") {`,
+      `  $Host = $matches[1]`,
+      `  $Port = $matches[2]`,
+      `}`,
+      `# Send JSON-RPC request`,
+      `$Client = New-Object System.Net.Sockets.TcpClient($Host, $Port)`,
+      `$Stream = $Client.GetStream()`,
+      `$Writer = New-Object System.IO.StreamWriter($Stream)`,
+      `$Writer.WriteLine('{"jsonrpc":"2.0","id":1,"method":"rpc.discover"}')`,
+      `$Writer.Flush()`,
+      `$Reader = New-Object System.IO.StreamReader($Stream)`,
+      `$Reader.ReadLine()`,
+      "```",
+      "",
+      RPC_BLOCK_END,
+    ].join("\n");
+  }
+
+  // macOS/Linux: Unix domain sockets
   return [
     RPC_BLOCK_START,
     "",
@@ -333,11 +486,24 @@ function installPluginSync(workspacePath: string): void {
     "utf-8",
   );
 
-  writeFileSync(
-    join(hooksDir, "agent-notify.sh"),
-    AGENT_NOTIFY_SCRIPT,
-    { mode: 0o755 },
-  );
+  // Install platform-specific agent notify script
+  const plat = platform();
+  const isWindows = plat === "win32";
+
+  if (isWindows) {
+    // Windows: PowerShell script (.ps1)
+    writeFileSync(
+      join(hooksDir, "agent-notify.ps1"),
+      AGENT_NOTIFY_SCRIPT_PS1,
+    );
+  } else {
+    // macOS/Linux: Bash script (.sh)
+    writeFileSync(
+      join(hooksDir, "agent-notify.sh"),
+      AGENT_NOTIFY_SCRIPT,
+      { mode: 0o755 },
+    );
+  }
 }
 
 /**

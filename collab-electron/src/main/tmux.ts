@@ -24,6 +24,10 @@ function getApp(): typeof import("electron").app | null {
 }
 
 export function getTmuxBin(): string {
+  // tmux is only available on macOS/Linux
+  if (process.platform === "win32") {
+    throw new Error("tmux is not available on Windows");
+  }
   const app = getApp();
   if (app?.isPackaged) {
     return path.join(process.resourcesPath, "tmux");
@@ -33,6 +37,10 @@ export function getTmuxBin(): string {
 
 
 export function getTmuxConf(): string {
+  // tmux.conf is only needed on macOS/Linux
+  if (process.platform === "win32") {
+    throw new Error("tmux configuration is not needed on Windows");
+  }
   const app = getApp();
   if (app?.isPackaged) {
     return path.join(process.resourcesPath, "tmux.conf");
@@ -45,6 +53,11 @@ export function getTmuxConf(): string {
 }
 
 export function getTerminfoDir(): string | undefined {
+  // terminfo is only needed for tmux on macOS/Linux
+  // Windows does not use tmux and does not need terminfo
+  if (process.platform === "win32") {
+    return undefined;
+  }
   const app = getApp();
   if (app?.isPackaged) {
     return path.join(process.resourcesPath, "terminfo");
@@ -72,6 +85,9 @@ function tmuxEnv(): Record<string, string> | undefined {
 }
 
 export function tmuxExec(...args: string[]): string {
+  if (process.platform === "win32") {
+    throw new Error("tmux is not available on Windows");
+  }
   return execFileSync(
     getTmuxBin(), [...baseArgs(), ...args],
     { encoding: "utf8", timeout: 5000, env: tmuxEnv() },

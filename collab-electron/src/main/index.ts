@@ -799,12 +799,17 @@ app.whenReady().then(async () => {
 
   shuttingDown = false;
 
-  try {
-    pty.verifyTmuxAvailable();
-  } catch (err) {
-    console.error(
-      "tmux binary not found or not executable:", err,
-    );
+  // Verify terminal backend availability based on platform
+  // macOS/Linux: Check for tmux binary
+  // Windows: node-pty is always available (no external binary required)
+  if (process.platform !== "win32") {
+    try {
+      pty.verifyTmuxAvailable();
+    } catch (err) {
+      console.error(
+        "tmux binary not found or not executable:", err,
+      );
+    }
   }
 
   config = loadConfig();
