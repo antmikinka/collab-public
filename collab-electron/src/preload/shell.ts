@@ -198,6 +198,11 @@ contextBridge.exposeInMainWorld("shellApi", {
     items: Array<{ id: string; label: string; enabled?: boolean }>,
   ) => ipcRenderer.invoke("context-menu:show", items),
 
+  // Window controls (for custom title bar on Windows)
+  minimizeWindow: () => ipcRenderer.send("window:minimize"),
+  maximizeWindow: () => ipcRenderer.send("window:maximize"),
+  closeWindow: () => ipcRenderer.send("window:close"),
+
   openExternal: (url: string) => ipcRenderer.send("shell:open-external", url),
 
   trackEvent: (name: string, properties?: Record<string, unknown>) => {

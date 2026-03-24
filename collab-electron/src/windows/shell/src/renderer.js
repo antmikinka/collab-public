@@ -11,6 +11,43 @@ import {
 } from "./tile-renderer.js";
 import { attachDrag, attachResize, attachMarquee } from "./tile-interactions.js";
 
+// -- Window controls (Windows only) --
+
+function initWindowControls() {
+	const isWindows = window.navigator.platform.includes("Win");
+	const windowControls = document.getElementById("window-controls");
+	if (!isWindows || !windowControls) {
+		// Hide on non-Windows or if element doesn't exist
+		if (windowControls) windowControls.style.display = "none";
+		return;
+	}
+
+	// Show window controls on Windows
+	windowControls.style.display = "flex";
+
+	const btnMinimize = document.getElementById("btn-minimize");
+	const btnMaximize = document.getElementById("btn-maximize");
+	const btnClose = document.getElementById("btn-close");
+
+	if (btnMinimize) {
+		btnMinimize.addEventListener("click", () => {
+			window.shellApi.minimizeWindow();
+		});
+	}
+	if (btnMaximize) {
+		btnMaximize.addEventListener("click", () => {
+			window.shellApi.maximizeWindow();
+		});
+	}
+	if (btnClose) {
+		btnClose.addEventListener("click", () => {
+			window.shellApi.closeWindow();
+		});
+	}
+}
+
+initWindowControls();
+
 // -- Dark mode --
 
 function applyCanvasOpacity(percent) {

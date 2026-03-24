@@ -703,6 +703,29 @@ ipcMain.on(
 ipcMain.on("settings:close", () => setSettingsOpen(false));
 ipcMain.on("settings:toggle", () => setSettingsOpen(!settingsOpen));
 
+// Window control IPC handlers (for custom title bar on Windows)
+ipcMain.on("window:minimize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.on("window:maximize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on("window:close", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+  }
+});
+
 function sendLoadingDone(): void {
   mainWindow?.webContents.send("shell:loading-done");
 }
