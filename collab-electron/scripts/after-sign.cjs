@@ -43,32 +43,37 @@ async function afterSign(context) {
   }
 
   if (electronPlatformName === 'win32') {
-    // Windows - verify signature
-    console.log('Verifying Windows signature...');
+    // Windows - verify signature (non-fatal for dev builds)
+    console.log('Verifying Windows signature (non-fatal for dev builds)...');
 
     const appName = packager.appInfo.productFilename;
     const appExe = path.join(appOutDir, `${appName}.exe`);
 
     if (fs.existsSync(appExe)) {
-      try {
-        // Find signtool
-        const signTool = findSignTool();
+      const signTool = findSignTool();
 
-        if (signTool) {
-          console.log(`Verifying: ${appExe}`);
+      if (signTool) {
+        console.log(`Verifying: ${appExe}`);
+        try {
+          // Capture output instead of inheriting stdio to prevent exit code propagation
           execSync(`"${signTool}" verify /pa "${appExe}"`, {
-            stdio: 'inherit'
+            stdio: ['pipe', 'pipe', 'pipe'],
+            encoding: 'utf-8'
           });
           console.log('Windows signature verification passed');
-        } else {
-          console.log('signtool.exe not found, skipping verification');
+        } catch (error) {
+          // Log as warning, not error - unsigned builds are expected for development
+          console.log('Note: This is an unsigned development build');
+          console.log('Signature verification output:', error.message?.substring(0, 500) || 'verification failed');
+          // Only fail the build if explicit signing is required
+          if (process.env.REQUIRE_SIGNING === 'true') {
+            throw new Error('Windows signing is required but verification failed');
+          }
+          // For dev builds: continue without failing
+          console.log('Continuing build process (unsigned build is acceptable for development)');
         }
-      } catch (error) {
-        console.error('Signature verification failed:', error.message);
-        // Don't fail the build if verification fails (may be unsigned dev build)
-        if (process.env.REQUIRE_SIGNING === 'true') {
-          throw new Error('Windows signing is required but verification failed');
-        }
+      } else {
+        console.log('signtool.exe not found, skipping signature verification');
       }
     } else {
       console.log(`App executable not found: ${appExe}`);

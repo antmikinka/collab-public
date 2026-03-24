@@ -106,19 +106,15 @@
 			"target": [
 				{
 					"target": "nsis",
-					"arch": ["x64", "arm64"]
+					"arch": ["x64"]
 				}
 			],
 			"artifactName": "${productName}-${version}-win-${arch}.${ext}",
-			"icon": "resources/icon.ico",
-			"requestedExecutionLevel": "asInvoker",
-			"signingHashAlgorithms": ["sha256"],
-			"sign": "./scripts/sign-win.cjs"
+			"requestedExecutionLevel": "asInvoker"
 		},
 		"nsis": {
 			"oneClick": false,
 			"allowToChangeInstallationDirectory": true,
-			"include": "build/installer.nsh",
 			"artifactName": "${productName}-${version}-win-${arch}-setup.${ext}",
 			"uninstallDisplayName": "${productName}",
 			"createDesktopShortcut": true,
