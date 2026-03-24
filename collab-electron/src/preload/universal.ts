@@ -75,6 +75,15 @@ ipcRenderer.on("replay:data", (_event, msg) => {
   for (const cb of replayDataListeners) cb(msg);
 });
 
+// -- Canvas opacity ---------------------------------------------------
+// The shell forwards canvas-opacity so webview backgrounds can match.
+ipcRenderer.on("canvas-opacity", (_event: unknown, value: number) => {
+  document.documentElement.style.setProperty(
+    "--canvas-opacity",
+    String(value),
+  );
+});
+
 // -- Workspace-changed buffer ----------------------------------------
 // Buffer workspace-changed messages that arrive before React registers
 // its onWorkspaceChanged listener (race between webview IPC delivery

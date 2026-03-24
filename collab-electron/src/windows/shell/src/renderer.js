@@ -25,12 +25,23 @@ canvasEl.tabIndex = -1;
 
 initDarkMode(() => viewport.updateCanvas());
 
+let broadcastCanvasOpacity = () => {};
+let lastCanvasOpacity = null;
+
 window.shellApi.getPref("canvasOpacity").then((v) => {
-	if (v != null) applyCanvasOpacity(v);
+	if (v != null) {
+		lastCanvasOpacity = v;
+		applyCanvasOpacity(v);
+		broadcastCanvasOpacity();
+	}
 });
 
 window.shellApi.onPrefChanged((key, value) => {
-	if (key === "canvasOpacity") applyCanvasOpacity(value);
+	if (key === "canvasOpacity") {
+		lastCanvasOpacity = value;
+		applyCanvasOpacity(value);
+		broadcastCanvasOpacity();
+	}
 });
 
 // -- Viewport --
@@ -202,6 +213,17 @@ async function init() {
 			panelManager.applyVisibility();
 		},
 	});
+
+	// Forward canvas opacity to all nav webviews
+	broadcastCanvasOpacity = () => {
+		if (lastCanvasOpacity == null) return;
+		const opacity = Math.max(0, Math.min(100, Number(lastCanvasOpacity) || 0)) / 100;
+		for (const nav of workspaceManager.getAllNavWebviews()) {
+			nav.send("canvas-opacity", opacity);
+		}
+		terminalListWebview.send("canvas-opacity", opacity);
+	};
+	broadcastCanvasOpacity();
 
 	// -- Tile manager --
 
@@ -512,6 +534,7 @@ async function init() {
 		) {
 			const newPath = wsList[wsList.length - 1];
 			workspaceManager.addWorkspace(newPath);
+			broadcastCanvasOpacity();
 		}
 		workspaceManager.switchWorkspace(active);
 	});
@@ -914,6 +937,7 @@ async function init() {
 					});
 				}
 			}
+
 			terminalListWebview.send(
 				"terminal-list:init", initEntries,
 			);

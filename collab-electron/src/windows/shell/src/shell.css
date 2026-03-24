@@ -3,6 +3,7 @@
 :root {
 	--font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 	--bg: rgb(248, 248, 248);
+	--bg-rgb: 248, 248, 248;
 	--canvas-bg: rgb(230, 230, 230);
 	--canvas-bg-hi: rgb(244, 244, 244);
 	--canvas-bg-rgb: 230, 230, 230;
@@ -24,6 +25,7 @@
 
 .dark {
 	--bg: rgb(18, 18, 18);
+	--bg-rgb: 18, 18, 18;
 	--canvas-bg: rgb(24, 24, 24);
 	--canvas-bg-hi: rgb(38, 38, 38);
 	--canvas-bg-rgb: 24, 24, 24;
@@ -116,7 +118,7 @@ body {
 	max-width: calc(var(--panel-nav-max) * 1px);
 	border-right: 1px solid var(--border);
 	overflow: hidden;
-	background: var(--bg);
+	background: rgba(var(--bg-rgb), calc(1 - (1 - var(--canvas-opacity)) / 2));
 }
 
 #panel-nav::after {
@@ -177,7 +179,8 @@ body {
 	flex-direction: column;
 	overflow: hidden;
 	min-height: 0;
-	background: var(--bg);
+	border-left: 1px solid var(--border);
+	background: rgba(var(--bg-rgb), calc(1 - (1 - var(--canvas-opacity)) / 2));
 }
 
 #panel-terminal webview {
