@@ -243,7 +243,7 @@ async function init() {
 			terminalListWebview.send("terminal-list:add", {
 				sessionId: tile.ptySessionId,
 				shell: "zsh",
-				cwd: "~",
+				cwd: tile.cwd || "~",
 				foreground: null,
 				tileId: tile.id,
 			});
