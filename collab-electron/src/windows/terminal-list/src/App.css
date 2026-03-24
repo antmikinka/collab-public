@@ -2,6 +2,14 @@
   --idle-color: #34d399;
   --busy-color: #fbbf24;
   --focus-bg: rgba(255, 255, 255, 0.06);
+  --border-focus: rgb(250, 250, 250);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --focus-bg: rgba(0, 0, 0, 0.04);
+    --border-focus: rgb(24, 24, 27);
+  }
 }
 
 * {
@@ -41,12 +49,12 @@ body {
   gap: 8px;
   padding: 6px 12px;
   cursor: pointer;
-  border-left: 2px solid transparent;
+  border-left: 3px solid transparent;
   transition: background 80ms ease;
 }
 
 .terminal-entry:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--focus-bg);
 }
 
 .terminal-entry.focused {
@@ -54,11 +62,11 @@ body {
 }
 
 .terminal-entry.focused.idle {
-  border-left-color: var(--idle-color);
+  border-left-color: var(--border-focus);
 }
 
 .terminal-entry.focused.busy {
-  border-left-color: var(--busy-color);
+  border-left-color: var(--border-focus);
 }
 
 .status-dot {

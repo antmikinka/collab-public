@@ -13,12 +13,6 @@ function shellBasename(shell: string): string {
   return shell.split("/").pop() || shell;
 }
 
-function truncateCwd(cwd: string): string {
-  const parts = cwd.split("/").filter(Boolean);
-  if (parts.length <= 3) return cwd;
-  return "\u2026/" + parts.slice(-2).join("/");
-}
-
 function isIdle(entry: TerminalEntry): boolean {
   if (!entry.foreground) return true;
   const base = shellBasename(entry.shell);
@@ -73,10 +67,33 @@ function App() {
     return cleanup;
   }, []);
 
-  function handleClick(sessionId: string) {
-    // sendToHost sends ipc-message to the <webview> tag in the shell renderer
-    window.api.sendToHost("terminal-list:focus-tile", sessionId);
+  function peekTile(sessionId: string) {
+    setFocusedSessionId(sessionId);
+    window.api.sendToHost("terminal-list:peek-tile", sessionId);
   }
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      if (entries.length === 0) return;
+
+      e.preventDefault();
+
+      const dir = e.key === "ArrowUp" ? -1 : 1;
+      const currentIdx = entries.findIndex(
+        (entry) => entry.sessionId === focusedSessionId,
+      );
+      const nextIdx =
+        currentIdx < 0
+          ? 0
+          : (currentIdx + dir + entries.length) % entries.length;
+
+      peekTile(entries[nextIdx].sessionId);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [entries, focusedSessionId]);
 
   return (
     <div className="terminal-list">
@@ -97,7 +114,7 @@ function App() {
           <div
             key={entry.sessionId}
             className={classes}
-            onClick={() => handleClick(entry.sessionId)}
+            onClick={() => peekTile(entry.sessionId)}
           >
             <div className={`status-dot ${stateClass}`} />
             <div className="entry-info">
@@ -112,7 +129,7 @@ function App() {
                 </span>
               </div>
               <div className="entry-cwd">
-                {truncateCwd(entry.cwd)}
+                {entry.cwd}
               </div>
             </div>
           </div>

@@ -955,7 +955,7 @@ async function init() {
 
 	terminalListWebview.webview.addEventListener(
 		"ipc-message", (event) => {
-			if (event.channel === "terminal-list:focus-tile") {
+			if (event.channel === "terminal-list:peek-tile") {
 				const sessionId = event.args[0];
 				for (const [id] of tileManager.getTileDOMs()) {
 					const tile = getTile(id);
@@ -963,19 +963,7 @@ async function init() {
 						tile?.type === "term" &&
 						tile.ptySessionId === sessionId
 					) {
-						const rect =
-							canvasEl.getBoundingClientRect();
-						const cx = tile.x + tile.width / 2;
-						const cy = tile.y + tile.height / 2;
-						viewportState.panX =
-							rect.width / 2
-							- cx * viewportState.zoom;
-						viewportState.panY =
-							rect.height / 2
-							- cy * viewportState.zoom;
-						viewport.updateCanvas();
-						tileManager.repositionAllTiles();
-						tileManager.focusCanvasTile(id);
+						edgeIndicators.panToTile(tile);
 						break;
 					}
 				}
