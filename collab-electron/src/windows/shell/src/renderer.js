@@ -788,6 +788,44 @@ async function init() {
 		return tile;
 	}
 
+	function hasGraphTileForWorkspace(wsPath) {
+		if (!wsPath) return false;
+		return tiles.some((t) => t.type === "graph" && t.workspacePath === wsPath);
+	}
+
+	function ensureGraphTileForWorkspace() {
+		const ws = getActiveWorkspace();
+		if (!ws) return;
+
+		const wsPath = ws.path;
+
+		// Skip if graph tile already exists
+		if (hasGraphTileForWorkspace(wsPath)) {
+			return;
+		}
+
+		// Check if already auto-created
+		window.shellApi.getWorkspaceConfig(wsPath).then((config) => {
+			if (config?.auto_created_graph) {
+				return;
+			}
+
+			// Auto-create graph tile on the right side of canvas
+			const size = defaultSize("graph");
+			const rect = canvasEl.getBoundingClientRect();
+
+			// Position: right side, vertically centered
+			const margin = 40;
+			const cx = (rect.width - margin - size.width - canvasX) / canvasScale;
+			const cy = (rect.height / 2 - canvasY) / canvasScale - size.height / 2;
+
+			createGraphTile(cx, cy, wsPath);
+
+			// Mark as auto-created
+			window.shellApi.setWorkspaceConfig(wsPath, { auto_created_graph: true });
+		});
+	}
+
 	function syncSelectionVisuals() {
 		for (const [id, dom] of tileDOMs) {
 			dom.container.classList.toggle("tile-selected", isSelected(id));
@@ -1684,6 +1722,7 @@ async function init() {
 		applyNavVisibility();
 		renderDropdown();
 		window.shellApi.workspaceSwitch(index);
+		ensureGraphTileForWorkspace();
 	}
 
 	// -- Workspace closing --

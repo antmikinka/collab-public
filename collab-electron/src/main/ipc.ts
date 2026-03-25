@@ -88,6 +88,7 @@ function activeWsConfig(): WorkspaceConfig {
       selected_file: null,
       expanded_dirs: [],
       agent_skip_permissions: false,
+      auto_created_graph: false,
     };
   }
   return getWsConfig(path);
@@ -617,6 +618,8 @@ export function registerIpcHandlers(config: AppConfig): void {
       if (key === "expanded_dirs") return config.expanded_dirs;
       if (key === "agent_skip_permissions")
         return config.agent_skip_permissions;
+      if (key === "auto_created_graph")
+        return config.auto_created_graph;
       return null;
     },
   );
@@ -636,6 +639,8 @@ export function registerIpcHandlers(config: AppConfig): void {
           : [];
       } else if (key === "agent_skip_permissions") {
         config.agent_skip_permissions = value === true;
+      } else if (key === "auto_created_graph") {
+        config.auto_created_graph = value === true;
       }
       saveWorkspaceConfig(active, config);
     },
@@ -645,6 +650,24 @@ export function registerIpcHandlers(config: AppConfig): void {
   ipcMain.handle(
     "shell:get-workspace-path",
     () => activeWorkspacePath() || null,
+  );
+
+  // Workspace config (direct get/set for full config)
+  ipcMain.handle(
+    "workspace-config:get",
+    (_event, workspacePath: string) => {
+      return getWsConfig(workspacePath);
+    },
+  );
+
+  ipcMain.handle(
+    "workspace-config:set",
+    (_event, workspacePath: string, configUpdate: Partial<WorkspaceConfig>) => {
+      const current = getWsConfig(workspacePath);
+      const updated = { ...current, ...configUpdate };
+      saveWorkspaceConfig(workspacePath, updated);
+      wsConfigMap.set(workspacePath, updated);
+    },
   );
 
   // --- Multi-workspace handlers ---

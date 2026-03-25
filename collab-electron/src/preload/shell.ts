@@ -158,6 +158,11 @@ contextBridge.exposeInMainWorld("shellApi", {
     ipcRenderer.invoke("workspace:switch", index),
   workspaceList: () => ipcRenderer.invoke("workspace:list"),
 
+  getWorkspaceConfig: (workspacePath: string) =>
+    ipcRenderer.invoke("workspace-config:get", workspacePath),
+  setWorkspaceConfig: (workspacePath: string, config: object) =>
+    ipcRenderer.invoke("workspace-config:set", workspacePath, config),
+
   onWorkspaceChanged: (cb: (path: string) => void) => {
     const handler = (_event: unknown, path: string) => cb(path);
     ipcRenderer.on("shell:workspace-changed", handler);
