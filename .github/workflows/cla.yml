@@ -1,0 +1,58 @@
+name: "CLA Signature Recorder"
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  record-signature:
+    if: |
+      github.event.issue.pull_request &&
+      github.event.comment.body == 'I have read the Contributor License Agreement (CLA) and hereby sign the CLA.'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
+      - name: Record signature
+        env:
+          SIGNER: ${{ github.event.comment.user.login }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+        run: |
+          set -euo pipefail
+
+          # Update .clabot contributors array
+          if ! jq -e --arg user "$SIGNER" '.contributors | index($user)' .clabot > /dev/null 2>&1; then
+            jq --arg user "$SIGNER" '.contributors += [$user]' .clabot > .clabot.tmp
+            mv .clabot.tmp .clabot
+          fi
+
+          # Append to cla-signatures.json
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          jq --arg name "$SIGNER" \
+             --arg ts "$TIMESTAMP" \
+             --argjson pr "$PR_NUMBER" \
+             --argjson cid "$COMMENT_ID" \
+             '.signedContributors += [{"name": $name, "created_at": $ts, "pullRequestNo": $pr, "comment_id": $cid}]' \
+             .github/cla-signatures.json > .github/cla-signatures.json.tmp
+          mv .github/cla-signatures.json.tmp .github/cla-signatures.json
+
+      - name: Commit and push
+        env:
+          SIGNER: ${{ github.event.comment.user.login }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${{ github.repository }}.git"
+          git add .clabot .github/cla-signatures.json
+          git diff --cached --quiet && exit 0
+          git commit -m "chore(legal): @${SIGNER} has signed the CLA"
+          git push origin HEAD:main

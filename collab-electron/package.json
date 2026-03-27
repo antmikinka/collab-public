@@ -1,6 +1,6 @@
 {
 	"name": "@collaborator/electron",
-	"version": "0.3.1",
+	"version": "0.4.2",
 	"private": true,
 	"license": "FSL-1.1-ALv2",
 	"type": "module",
@@ -9,7 +9,7 @@
 	],
 	"main": "out/main/index.js",
 	"scripts": {
-		"dev": "electron-vite dev",
+		"dev": "unset ELECTRON_EXEC_PATH && electron-vite dev",
 		"build": "electron-vite build",
 		"preview": "electron-vite preview",
 		"package": "./scripts/package.sh",
@@ -83,18 +83,6 @@
 			"notarize": false,
 			"entitlements": "build/entitlements.mac.plist",
 			"entitlementsInherit": "build/entitlements.mac.plist",
-			"fileAssociations": [
-				{
-					"ext": [
-						"md",
-						"mdx",
-						"markdown",
-						"txt"
-					],
-					"name": "Text Document",
-					"role": "Editor"
-				}
-			],
 			"target": [
 				{
 					"target": "zip",

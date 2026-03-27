@@ -73,10 +73,15 @@ function request(
   });
 }
 
+function isInsideCacheDir(path: string): boolean {
+  return cacheDir !== null && path.startsWith(cacheDir + "/");
+}
+
 export function getImageThumbnail(
   path: string,
   size: number,
 ): Promise<string> {
+  if (isInsideCacheDir(path)) return Promise.resolve("");
   return request("thumbnail", path, { size }) as Promise<string>;
 }
 
@@ -89,6 +94,9 @@ function isNativeImage(path: string): boolean {
 export function getImageFull(
   path: string,
 ): Promise<{ url: string; width: number; height: number }> {
+  if (isInsideCacheDir(path)) {
+    return Promise.resolve({ url: "", width: 0, height: 0 });
+  }
   if (isNativeImage(path)) {
     const url = `collab-file://${encodeURIComponent(path).replace(/%2F/g, "/")}`;
     return Promise.resolve({ url, width: 0, height: 0 });
@@ -103,8 +111,10 @@ export function getImageFull(
 
 export function invalidateImageCache(paths: string[]): void {
   if (!worker) return;
+  const filtered = paths.filter((p) => !isInsideCacheDir(p));
+  if (filtered.length === 0) return;
   const id = nextId++;
-  worker.postMessage({ id, op: "invalidate", path: "", paths });
+  worker.postMessage({ id, op: "invalidate", path: "", paths: filtered });
 }
 
 async function fileExists(path: string): Promise<boolean> {
