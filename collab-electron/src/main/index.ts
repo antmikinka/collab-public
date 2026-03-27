@@ -526,6 +526,7 @@ function createWindow(): void {
     trafficLightPosition: isMac ? { x: 14, y: 12 } : undefined,
     // Windows-specific window options
     frame: process.platform === "win32" ? false : undefined,
+    transparent: process.platform === "win32" ? true : undefined,
     titleBarOverlay: process.platform === "win32" ? {
       color: "#1e1e1e",
       symbolColor: "#ffffff",
